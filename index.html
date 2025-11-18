@@ -1,0 +1,2071 @@
+<!doctype html>
+<html lang="en">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DNS Deep Dive - Understanding Domain Name System</title>
+  <script src="/_sdk/element_sdk.js"></script>
+  <style>
+        body {
+            box-sizing: border-box;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #2c3e50;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            overflow-x: hidden;
+        }
+
+        /* Animated Background Particles */
+        .particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        .particle {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            animation: float 6s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); opacity: 0.3; }
+            50% { transform: translateY(-20px) rotate(180deg); opacity: 0.8; }
+        }
+
+        /* Header Styles */
+        header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 1rem 0;
+            position: fixed;
+            width: 100%;
+            top: 0;
+            z-index: 1000;
+            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
+            animation: slideDown 0.8s ease-out;
+        }
+
+        @keyframes slideDown {
+            from { transform: translateY(-100%); }
+            to { transform: translateY(0); }
+        }
+
+        nav {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 2rem;
+        }
+
+        .logo {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #667eea;
+            text-decoration: none;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .nav-links {
+            display: flex;
+            list-style: none;
+            gap: 2rem;
+        }
+
+        .nav-links a {
+            text-decoration: none;
+            color: #2c3e50;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .nav-links a::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: #667eea;
+            transition: width 0.3s ease;
+        }
+
+        .nav-links a:hover::after {
+            width: 100%;
+        }
+
+        /* Hero Section */
+        .hero {
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero-content {
+            max-width: 800px;
+            padding: 0 2rem;
+            animation: fadeInUp 1s ease-out 0.5s both;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .hero h1 {
+            font-size: 3.5rem;
+            margin-bottom: 1rem;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .hero p {
+            font-size: 1.3rem;
+            margin-bottom: 2rem;
+            opacity: 0.9;
+        }
+
+        .cta-button {
+            display: inline-block;
+            padding: 15px 30px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            text-decoration: none;
+            border-radius: 50px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .cta-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Main Content */
+        main {
+            background: white;
+            margin-top: 0;
+            position: relative;
+            z-index: 10;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 4rem 2rem;
+        }
+
+        .article-header {
+            text-align: center;
+            margin-bottom: 3rem;
+            animation: fadeInUp 0.8s ease-out;
+        }
+
+        .article-header h2 {
+            font-size: 2.5rem;
+            color: #2c3e50;
+            margin-bottom: 1rem;
+        }
+
+        .article-meta {
+            color: #7f8c8d;
+            font-size: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        /* DNS Animation Container */
+        .dns-animation {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 20px;
+            padding: 3rem;
+            margin: 3rem 0;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+        }
+
+        .dns-flow {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 2rem;
+            margin: 2rem 0;
+        }
+
+        .dns-step {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            min-width: 200px;
+            position: relative;
+            animation: bounceIn 0.8s ease-out;
+            animation-fill-mode: both;
+        }
+
+        .dns-step:nth-child(1) { animation-delay: 0.2s; }
+        .dns-step:nth-child(2) { animation-delay: 0.4s; }
+        .dns-step:nth-child(3) { animation-delay: 0.6s; }
+        .dns-step:nth-child(4) { animation-delay: 0.8s; }
+
+        @keyframes bounceIn {
+            0% {
+                opacity: 0;
+                transform: scale(0.3) translateY(50px);
+            }
+            50% {
+                opacity: 1;
+                transform: scale(1.05) translateY(-10px);
+            }
+            70% {
+                transform: scale(0.9) translateY(0);
+            }
+            100% {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        .dns-step h4 {
+            color: #667eea;
+            margin-bottom: 0.5rem;
+            font-size: 1.1rem;
+        }
+
+        .dns-step p {
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        /* Animated Arrows */
+        .arrow {
+            position: absolute;
+            width: 50px;
+            height: 2px;
+            background: #667eea;
+            top: 50%;
+            right: -25px;
+            transform: translateY(-50%);
+        }
+
+        .arrow::after {
+            content: '';
+            position: absolute;
+            right: -8px;
+            top: -4px;
+            width: 0;
+            height: 0;
+            border-left: 10px solid #667eea;
+            border-top: 5px solid transparent;
+            border-bottom: 5px solid transparent;
+            animation: arrowPulse 2s ease-in-out infinite;
+        }
+
+        @keyframes arrowPulse {
+            0%, 100% { transform: translateX(0); opacity: 1; }
+            50% { transform: translateX(10px); opacity: 0.7; }
+        }
+
+        /* Content Sections */
+        .content-section {
+            margin: 4rem 0;
+            padding: 2rem;
+            background: #f8f9fa;
+            border-radius: 15px;
+            border-left: 5px solid #667eea;
+            animation: slideInLeft 0.8s ease-out;
+        }
+
+        @keyframes slideInLeft {
+            from {
+                opacity: 0;
+                transform: translateX(-50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .content-section h3 {
+            color: #2c3e50;
+            font-size: 1.8rem;
+            margin-bottom: 1rem;
+            position: relative;
+        }
+
+        .content-section h3::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            left: 0;
+            width: 50px;
+            height: 3px;
+            background: #667eea;
+            border-radius: 2px;
+        }
+
+
+
+
+
+        /* Code Blocks */
+        .code-block {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 1.5rem;
+            border-radius: 10px;
+            margin: 1.5rem 0;
+            font-family: 'Courier New', monospace;
+            overflow-x: auto;
+            position: relative;
+        }
+
+        .code-block::before {
+            content: 'DNS Query Example';
+            position: absolute;
+            top: -10px;
+            left: 15px;
+            background: #667eea;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-family: 'Segoe UI', sans-serif;
+        }
+
+        /* Statistics Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+            margin: 3rem 0;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease;
+            animation: fadeInUp 0.8s ease-out;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-10px);
+        }
+
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 0.5rem;
+            animation: countUp 2s ease-out;
+        }
+
+        @keyframes countUp {
+            from { opacity: 0; transform: scale(0.5); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        /* Footer */
+        footer {
+            background: #2c3e50;
+            color: white;
+            text-align: center;
+            padding: 3rem 2rem;
+            margin-top: 4rem;
+        }
+
+        .footer-content {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 2.5rem;
+            }
+
+            .hero p {
+                font-size: 1.1rem;
+            }
+
+            .nav-links {
+                display: none;
+            }
+
+            .dns-flow {
+                flex-direction: column;
+            }
+
+            .dns-step {
+                min-width: 100%;
+            }
+
+            .arrow {
+                display: none;
+            }
+
+            .simulator-input {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .simulator-input input {
+                min-width: 100%;
+                margin-bottom: 1rem;
+            }
+
+            .container {
+                padding: 2rem 1rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .hero h1 {
+                font-size: 2rem;
+            }
+
+            .article-header h2 {
+                font-size: 2rem;
+            }
+
+            .dns-animation {
+                padding: 1.5rem;
+            }
+
+            .content-section {
+                padding: 1.5rem;
+            }
+        }
+
+        /* Scroll Animations */
+        .fade-in-on-scroll {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: all 0.8s ease-out;
+        }
+
+        .fade-in-on-scroll.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* DNS Diagram Specific Styles */
+        .dns-architecture {
+            margin: 2rem 0;
+            position: relative;
+        }
+
+        .dns-component {
+            cursor: pointer;
+            transition: all 0.5s ease;
+            filter: drop-shadow(0 4px 8px rgba(0,0,0,0.1));
+        }
+
+        .dns-component:hover {
+            transform: scale(1.08);
+            filter: drop-shadow(0 8px 16px rgba(0,0,0,0.2));
+        }
+
+        .dns-component.active {
+            transform: scale(1.15);
+            filter: drop-shadow(0 12px 24px rgba(102, 126, 234, 0.4));
+            animation: componentGlow 1s ease-in-out;
+        }
+
+        @keyframes componentGlow {
+            0%, 100% { filter: drop-shadow(0 12px 24px rgba(102, 126, 234, 0.4)); }
+            50% { filter: drop-shadow(0 16px 32px rgba(102, 126, 234, 0.8)); }
+        }
+
+        /* Advanced Animation Controls */
+        .animation-controls {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin: 2rem 0;
+            flex-wrap: wrap;
+        }
+
+        .control-btn {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .control-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.5);
+        }
+
+        .control-btn:active {
+            transform: translateY(0);
+        }
+
+        .control-btn.active {
+            background: linear-gradient(135deg, #48bb78, #38a169);
+        }
+
+        /* Data Packet Animation */
+        .data-packet {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: radial-gradient(circle, #667eea, #764ba2);
+            border-radius: 50%;
+            box-shadow: 0 0 20px rgba(102, 126, 234, 0.8);
+            opacity: 0;
+            z-index: 100;
+        }
+
+        .data-packet::after {
+            content: '';
+            position: absolute;
+            top: -5px;
+            left: -5px;
+            right: -5px;
+            bottom: -5px;
+            border: 2px solid rgba(102, 126, 234, 0.5);
+            border-radius: 50%;
+            animation: packetPulse 1s ease-in-out infinite;
+        }
+
+        @keyframes packetPulse {
+            0%, 100% { transform: scale(1); opacity: 0.5; }
+            50% { transform: scale(1.5); opacity: 0.2; }
+        }
+
+        /* Query Path Visualization */
+        .query-path {
+            stroke-dasharray: 10, 5;
+            stroke-width: 4;
+            opacity: 0;
+            animation: pathTrace 2s ease-in-out;
+        }
+
+        @keyframes pathTrace {
+            0% { stroke-dashoffset: 100; opacity: 0; }
+            20% { opacity: 1; }
+            100% { stroke-dashoffset: 0; opacity: 1; }
+        }
+
+        /* Step Indicator */
+        .step-indicator {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px 25px;
+            border-radius: 15px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            font-weight: 600;
+            color: #2c3e50;
+            border: 2px solid #667eea;
+        }
+
+        /* Loading Animation */
+        .loading-animation {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(102, 126, 234, 0.3);
+            border-radius: 50%;
+            border-top-color: #667eea;
+            animation: spin 1s ease-in-out infinite;
+            margin-left: 10px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Response Animation */
+        .response-animation {
+            position: absolute;
+            background: linear-gradient(135deg, #48bb78, #38a169);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            opacity: 0;
+            transform: translateY(-10px);
+            animation: responsePopup 1.5s ease-out;
+            box-shadow: 0 4px 15px rgba(72, 187, 120, 0.4);
+        }
+
+        @keyframes responsePopup {
+            0% { opacity: 0; transform: translateY(-10px) scale(0.8); }
+            20% { opacity: 1; transform: translateY(-20px) scale(1.1); }
+            80% { opacity: 1; transform: translateY(-20px) scale(1); }
+            100% { opacity: 0; transform: translateY(-30px) scale(0.9); }
+        }
+
+        /* Enhanced Arrow Animations */
+        .enhanced-arrow {
+            stroke-width: 6;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+        }
+
+        .enhanced-arrow.active {
+            animation: arrowFlow 2s ease-in-out;
+        }
+
+        @keyframes arrowFlow {
+            0% { stroke-dasharray: 0, 100; opacity: 0; }
+            20% { opacity: 1; }
+            100% { stroke-dasharray: 100, 0; opacity: 1; }
+        }
+
+        /* Timeline Visualization */
+        .timeline-container {
+            margin: 3rem 0;
+            padding: 2rem;
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            border-radius: 20px;
+            position: relative;
+        }
+
+        .timeline {
+            position: relative;
+            height: 80px;
+            background: #fff;
+            border-radius: 40px;
+            box-shadow: inset 0 4px 8px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .timeline-progress {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2, #48bb78);
+            border-radius: 40px;
+            width: 0%;
+            transition: width 0.5s ease;
+            position: relative;
+        }
+
+        .timeline-progress::after {
+            content: '';
+            position: absolute;
+            right: -10px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 20px;
+            height: 20px;
+            background: #fff;
+            border-radius: 50%;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+
+        .timeline-labels {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 1rem;
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        /* Performance Metrics */
+        .performance-metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 2rem 0;
+        }
+
+        .metric-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            border-left: 4px solid #667eea;
+            transition: transform 0.3s ease;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .metric-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 0.5rem;
+            animation: countUp 2s ease-out;
+        }
+
+        .metric-label {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        /* 3D Effect for Components */
+        .dns-component-3d {
+            transform-style: preserve-3d;
+            transition: transform 0.5s ease;
+        }
+
+        .dns-component-3d:hover {
+            transform: rotateY(10deg) rotateX(5deg) scale(1.05);
+        }
+
+        .dns-component-3d.active {
+            transform: rotateY(15deg) rotateX(10deg) scale(1.1);
+            animation: component3DFloat 2s ease-in-out infinite;
+        }
+
+        @keyframes component3DFloat {
+            0%, 100% { transform: rotateY(15deg) rotateX(10deg) scale(1.1) translateZ(0px); }
+            50% { transform: rotateY(15deg) rotateX(10deg) scale(1.1) translateZ(20px); }
+        }
+
+        .step-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .detailed-step {
+            display: flex;
+            align-items: center;
+            background: white;
+            padding: 1.5rem;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+            animation: slideInRight 0.8s ease-out;
+            animation-fill-mode: both;
+        }
+
+        .detailed-step:nth-child(odd) {
+            animation: slideInLeft 0.8s ease-out;
+            animation-fill-mode: both;
+        }
+
+        .detailed-step:nth-child(1) { animation-delay: 0.1s; }
+        .detailed-step:nth-child(2) { animation-delay: 0.2s; }
+        .detailed-step:nth-child(3) { animation-delay: 0.3s; }
+        .detailed-step:nth-child(4) { animation-delay: 0.4s; }
+        .detailed-step:nth-child(5) { animation-delay: 0.5s; }
+        .detailed-step:nth-child(6) { animation-delay: 0.6s; }
+        .detailed-step:nth-child(7) { animation-delay: 0.7s; }
+
+        @keyframes slideInRight {
+            from {
+                opacity: 0;
+                transform: translateX(50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .detailed-step:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+        }
+
+        .step-number {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-right: 1.5rem;
+            flex-shrink: 0;
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .step-content {
+            flex: 1;
+        }
+
+        .step-content h5 {
+            color: #2c3e50;
+            font-size: 1.3rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .step-content p {
+            color: #666;
+            margin-bottom: 1rem;
+            line-height: 1.6;
+        }
+
+        .step-details {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .detail-tag {
+            background: #f8f9fa;
+            color: #667eea;
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            border: 1px solid #e9ecef;
+        }
+
+        /* DNS Records Grid */
+        .records-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .record-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+            border-top: 4px solid #667eea;
+            animation: fadeInUp 0.8s ease-out;
+            animation-fill-mode: both;
+        }
+
+        .record-card:nth-child(1) { animation-delay: 0.1s; }
+        .record-card:nth-child(2) { animation-delay: 0.2s; }
+        .record-card:nth-child(3) { animation-delay: 0.3s; }
+        .record-card:nth-child(4) { animation-delay: 0.4s; }
+        .record-card:nth-child(5) { animation-delay: 0.5s; }
+        .record-card:nth-child(6) { animation-delay: 0.6s; }
+
+        .record-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.15);
+        }
+
+        .record-type {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin: 0 auto 1rem auto;
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .record-card h5 {
+            color: #2c3e50;
+            font-size: 1.2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .record-card p {
+            color: #666;
+            margin-bottom: 1rem;
+        }
+
+        .record-card code {
+            background: #f8f9fa;
+            color: #667eea;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            display: block;
+            border: 1px solid #e9ecef;
+        }
+
+        /* Animated SVG Elements */
+        .dns-component {
+            animation: componentPulse 3s ease-in-out infinite;
+        }
+
+        .dns-component:nth-child(1) { animation-delay: 0s; }
+        .dns-component:nth-child(2) { animation-delay: 0.5s; }
+        .dns-component:nth-child(3) { animation-delay: 1s; }
+        .dns-component:nth-child(4) { animation-delay: 1.5s; }
+        .dns-component:nth-child(5) { animation-delay: 2s; }
+        .dns-component:nth-child(6) { animation-delay: 2.5s; }
+        .dns-component:nth-child(7) { animation-delay: 3s; }
+
+        @keyframes componentPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+
+        /* Floating Action Button */
+        .fab {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            width: 60px;
+            height: 60px;
+            background: #667eea;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            text-decoration: none;
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+            transition: all 0.3s ease;
+            z-index: 1000;
+        }
+
+        .fab:hover {
+            transform: translateY(-5px) scale(1.1);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.6);
+        }
+
+        /* Progress Bar */
+        .progress-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 0%;
+            height: 4px;
+            background: #667eea;
+            z-index: 9999;
+            transition: width 0.3s ease;
+        }
+
+        /* Mobile Responsive for Diagram */
+        @media (max-width: 768px) {
+            .step-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .detailed-step {
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .step-number {
+                margin-right: 0;
+                margin-bottom: 1rem;
+            }
+            
+            .records-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .dns-architecture svg {
+                height: 400px;
+            }
+        }
+    </style>
+  <style>@view-transition { navigation: auto; }</style>
+  <script src="/_sdk/data_sdk.js" type="text/javascript"></script>
+  <script src="https://cdn.tailwindcss.com" type="text/javascript"></script>
+ </head>
+ <body><!-- Progress Bar -->
+  <div class="progress-bar" id="progressBar"></div><!-- Animated Background Particles -->
+  <div class="particles" id="particles"></div><!-- Header -->
+  <header>
+   <nav><a href="#" class="logo" id="blogTitle">DNS Deep Dive <p>By Neeraj jaiswar</p></a>
+    <ul class="nav-links">
+     <li><a href="#home">Home</a></li>
+     <li><a href="#concepts">Concepts</a></li>
+     <li><a href="#stats">Statistics</a></li>
+     <li><a href="#contact">Contact</a></li>
+    </ul>
+   </nav>
+  </header><!-- Hero Section -->
+  <section class="hero" id="home">
+   <div class="hero-content">
+    <h1 id="heroTitle">Understanding DNS</h1>
+    <p id="heroSubtitle">Explore the Domain Name System with interactive animations and crystal-clear explanations</p><a href="#concepts" class="cta-button">Start Learning</a>
+   </div>
+  </section><!-- Main Content -->
+  <main>
+   <div class="container"><!-- Article Header -->
+    <div class="article-header fade-in-on-scroll">
+     <h2 id="articleTitle">The Complete Guide to DNS: How the Internet Finds Your Website</h2>
+     <div class="article-meta">
+      By <strong id="authorName">Neeraj Jaiswar</strong> • Published Today • 15 min read
+     </div>
+    </div><!-- Detailed DNS Diagram Section -->
+    <section class="dns-animation fade-in-on-scroll" id="concepts">
+     <h3 style="text-align: center; margin-bottom: 2rem; color: #2c3e50;">Complete DNS Resolution Process - Interactive Diagram</h3><!-- Animation Controls -->
+     <div class="animation-controls"><button class="control-btn" id="playBtn">▶️ Play Animation</button> <button class="control-btn" id="pauseBtn">⏸️ Pause</button> <button class="control-btn" id="resetBtn">🔄 Reset</button> <button class="control-btn" id="slowBtn">🐌 Slow Motion</button> <button class="control-btn" id="fastBtn">⚡ Fast Mode</button>
+     </div><!-- Performance Timeline -->
+     <div class="timeline-container">
+      <h4 style="text-align: center; margin-bottom: 1rem; color: #2c3e50;">DNS Query Timeline</h4>
+      <div class="timeline">
+       <div class="timeline-progress" id="timelineProgress"></div>
+      </div>
+      <div class="timeline-labels"><span>Start</span> <span>Cache Check</span> <span>ISP Query</span> <span>Root Servers</span> <span>TLD Servers</span> <span>Auth Servers</span> <span>Complete</span>
+      </div>
+     </div><!-- Real-time Performance Metrics -->
+     <div class="performance-metrics">
+      <div class="metric-card">
+       <div class="metric-value" id="currentStep">
+        0
+       </div>
+       <div class="metric-label">
+        Current Step
+       </div>
+      </div>
+      <div class="metric-card">
+       <div class="metric-value" id="elapsedTime">
+        0ms
+       </div>
+       <div class="metric-label">
+        Elapsed Time
+       </div>
+      </div>
+      <div class="metric-card">
+       <div class="metric-value" id="packetsTransmitted">
+        0
+       </div>
+       <div class="metric-label">
+        Packets Sent
+       </div>
+      </div>
+      <div class="metric-card">
+       <div class="metric-value" id="serversContacted">
+        0
+       </div>
+       <div class="metric-label">
+        Servers Contacted
+       </div>
+      </div>
+     </div><!-- DNS Architecture Diagram -->
+     <div class="dns-architecture"><!-- Step Indicator -->
+      <div class="step-indicator" id="stepIndicator">
+       Step 1: User Input <span class="loading-animation" id="loadingSpinner" style="display: none;"></span>
+      </div>
+      <svg width="100%" height="800" viewbox="0 0 1200 800" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 15px; margin-bottom: 2rem;" id="dnsSvg"><!-- Background Grid --> <defs>
+        <pattern id="grid" width="50" height="50" patternunits="userSpaceOnUse">
+         <path d="M 50 0 L 0 0 0 50" fill="none" stroke="rgba(102, 126, 234, 0.1)" stroke-width="1" />
+        </pattern>
+        <filter id="glow">
+         <fegaussianblur stddeviation="4" result="coloredBlur" />
+         <femerge>
+          <femergenode in="coloredBlur" />
+          <femergenode in="SourceGraphic" />
+         </femerge>
+        </filter>
+       </defs> <rect width="100%" height="100%" fill="url(#grid)" opacity="0.3" /> <!-- User/Browser --> <g class="dns-component dns-component-3d user-browser" data-step="1" id="userComponent">
+        <rect x="60" y="600" width="160" height="120" rx="15" fill="#667eea" stroke="#5a67d8" stroke-width="3" filter="url(#glow)" />
+        <circle cx="100" cy="630" r="12" fill="white" opacity="0.9" />
+        <text x="140" y="640" text-anchor="middle" fill="white" font-size="18" font-weight="bold">
+         👤 User
+        </text>
+        <text x="140" y="660" text-anchor="middle" fill="white" font-size="14">
+         Browser
+        </text>
+        <text x="140" y="680" text-anchor="middle" fill="white" font-size="12">
+         www.example.com
+        </text>
+        <text x="140" y="700" text-anchor="middle" fill="white" font-size="11">
+         Step 1: Types URL
+        </text> <!-- Typing Animation -->
+        <rect x="80" y="730" width="120" height="20" rx="10" fill="rgba(255,255,255,0.2)" id="typingBar" opacity="0">
+         <animate attributename="width" values="0;120;120;0" dur="2s" repeatcount="indefinite" begin="0s" />
+        </rect>
+       </g> <!-- Local DNS Cache --> <g class="dns-component dns-component-3d local-cache" data-step="2" id="cacheComponent">
+        <rect x="300" y="600" width="160" height="120" rx="15" fill="#48bb78" stroke="#38a169" stroke-width="3" filter="url(#glow)" />
+        <circle cx="340" cy="630" r="10" fill="white" opacity="0.8">
+         <animate attributename="r" values="10;15;10" dur="2s" repeatcount="indefinite" begin="1s" />
+        </circle>
+        <text x="380" y="640" text-anchor="middle" fill="white" font-size="18" font-weight="bold">
+         💾 Local Cache
+        </text>
+        <text x="380" y="660" text-anchor="middle" fill="white" font-size="14">
+         Browser/OS
+        </text>
+        <text x="380" y="680" text-anchor="middle" fill="white" font-size="12">
+         Check Cache
+        </text>
+        <text x="380" y="700" text-anchor="middle" fill="white" font-size="11">
+         Step 2: Cache Lookup
+        </text> <!-- Cache Search Animation -->
+        <rect x="320" y="730" width="0" height="15" rx="7" fill="rgba(255,255,255,0.3)" id="cacheSearch">
+         <animate attributename="width" values="0;120;0" dur="1.5s" repeatcount="indefinite" begin="1s" />
+        </rect>
+       </g> <!-- ISP DNS Resolver --> <g class="dns-component dns-component-3d isp-resolver" data-step="3" id="ispComponent">
+        <rect x="540" y="600" width="160" height="120" rx="15" fill="#ed8936" stroke="#dd6b20" stroke-width="3" filter="url(#glow)" />
+        <circle cx="580" cy="630" r="12" fill="white" opacity="0.9">
+         <animate attributename="opacity" values="0.9;0.3;0.9" dur="1.8s" repeatcount="indefinite" begin="2s" />
+        </circle>
+        <text x="620" y="640" text-anchor="middle" fill="white" font-size="18" font-weight="bold">
+         🌐 ISP Resolver
+        </text>
+        <text x="620" y="660" text-anchor="middle" fill="white" font-size="14">
+         Recursive DNS
+        </text>
+        <text x="620" y="680" text-anchor="middle" fill="white" font-size="12">
+         8.8.8.8
+        </text>
+        <text x="620" y="700" text-anchor="middle" fill="white" font-size="11">
+         Step 3: Query ISP
+        </text> <!-- Network Activity -->
+        <g id="networkActivity" opacity="0">
+         <circle cx="600" cy="620" r="5" fill="yellow">
+          <animate attributename="r" values="5;20;5" dur="1s" repeatcount="indefinite" />
+          <animate attributename="opacity" values="1;0;1" dur="1s" repeatcount="indefinite" />
+         </circle>
+        </g>
+       </g> <!-- Root Name Servers --> <g class="dns-component dns-component-3d root-servers" data-step="4" id="rootComponent">
+        <rect x="780" y="450" width="160" height="120" rx="15" fill="#e53e3e" stroke="#c53030" stroke-width="3" filter="url(#glow)" />
+        <circle cx="820" cy="480" r="8" fill="white">
+         <animate attributename="cy" values="480;495;480" dur="2s" repeatcount="indefinite" begin="3s" />
+        </circle>
+        <circle cx="850" cy="485" r="6" fill="white">
+         <animate attributename="cy" values="485;500;485" dur="2.2s" repeatcount="indefinite" begin="3.2s" />
+        </circle>
+        <circle cx="880" cy="480" r="8" fill="white">
+         <animate attributename="cy" values="480;495;480" dur="1.8s" repeatcount="indefinite" begin="3.4s" />
+        </circle>
+        <text x="860" y="510" text-anchor="middle" fill="white" font-size="18" font-weight="bold">
+         🌍 Root Servers
+        </text>
+        <text x="860" y="530" text-anchor="middle" fill="white" font-size="14">
+         13 Global Servers
+        </text>
+        <text x="860" y="550" text-anchor="middle" fill="white" font-size="11">
+         Step 4: Find TLD
+        </text>
+       </g> <!-- TLD Servers --> <g class="dns-component dns-component-3d tld-servers" data-step="5" id="tldComponent">
+        <rect x="780" y="280" width="160" height="120" rx="15" fill="#805ad5" stroke="#6b46c1" stroke-width="3" filter="url(#glow)" />
+        <text x="820" y="310" text-anchor="middle" fill="white" font-size="20" font-weight="bold">
+         .com
+        </text>
+        <text x="860" y="310" text-anchor="middle" fill="white" font-size="16">
+         .org
+        </text>
+        <text x="900" y="310" text-anchor="middle" fill="white" font-size="14">
+         .net
+        </text>
+        <text x="860" y="335" text-anchor="middle" fill="white" font-size="18" font-weight="bold">
+         🏢 TLD Servers
+        </text>
+        <text x="860" y="355" text-anchor="middle" fill="white" font-size="14">
+         Top Level Domains
+        </text>
+        <text x="860" y="375" text-anchor="middle" fill="white" font-size="11">
+         Step 5: Find Auth NS
+        </text> <!-- TLD Selection Animation -->
+        <rect x="810" y="300" width="40" height="20" rx="10" fill="rgba(255,255,255,0.2)" opacity="0" id="tldHighlight">
+         <animate attributename="opacity" values="0;0.8;0" dur="1.5s" repeatcount="indefinite" begin="4s" />
+        </rect>
+       </g> <!-- Authoritative Name Servers --> <g class="dns-component dns-component-3d auth-servers" data-step="6" id="authComponent">
+        <rect x="780" y="110" width="160" height="120" rx="15" fill="#38b2ac" stroke="#319795" stroke-width="3" filter="url(#glow)" />
+        <rect x="810" y="140" width="80" height="60" rx="8" fill="rgba(255,255,255,0.2)" stroke="white" stroke-width="2" />
+        <text x="850" y="165" text-anchor="middle" fill="white" font-size="14">
+         DNS
+        </text>
+        <text x="850" y="180" text-anchor="middle" fill="white" font-size="14">
+         Records
+        </text>
+        <text x="860" y="205" text-anchor="middle" fill="white" font-size="18" font-weight="bold">
+         🏛️ Auth Servers
+        </text>
+        <text x="860" y="220" text-anchor="middle" fill="white" font-size="11">
+         Step 6: Get IP
+        </text> <!-- Database Query Animation -->
+        <circle cx="850" cy="170" r="4" fill="yellow" opacity="0" id="dbQuery">
+         <animate attributename="r" values="4;12;4" dur="1s" repeatcount="indefinite" begin="5s" />
+         <animate attributename="opacity" values="0;1;0" dur="1s" repeatcount="indefinite" begin="5s" />
+        </circle>
+       </g> <!-- Web Server --> <g class="dns-component dns-component-3d web-server" data-step="7" id="webComponent">
+        <rect x="540" y="110" width="160" height="120" rx="15" fill="#d69e2e" stroke="#b7791f" stroke-width="3" filter="url(#glow)" />
+        <rect x="570" y="140" width="100" height="45" rx="8" fill="rgba(255,255,255,0.2)" stroke="white" stroke-width="2" />
+        <text x="620" y="160" text-anchor="middle" fill="white" font-size="12">
+         192.168.1.100
+        </text>
+        <text x="620" y="175" text-anchor="middle" fill="white" font-size="11">
+         example.com
+        </text>
+        <text x="620" y="200" text-anchor="middle" fill="white" font-size="18" font-weight="bold">
+         🖥️ Web Server
+        </text>
+        <text x="620" y="220" text-anchor="middle" fill="white" font-size="11">
+         Step 7: Serve Content
+        </text> <!-- Server Activity -->
+        <g id="serverActivity" opacity="0">
+         <rect x="580" y="150" width="80" height="25" rx="5" fill="rgba(72,187,120,0.3)">
+          <animate attributename="fill" values="rgba(72,187,120,0.3);rgba(72,187,120,0.8);rgba(72,187,120,0.3)" dur="1s" repeatcount="indefinite" />
+         </rect>
+        </g>
+       </g> <!-- Enhanced Animated Arrows with Data Packets --> <g class="dns-arrows" id="dnsArrows"><!-- Query Paths -->
+        <path id="path1" class="query-path enhanced-arrow" d="M 220 660 Q 260 660 300 660" stroke="#667eea" stroke-width="6" fill="none" marker-end="url(#arrowhead)" opacity="0" />
+        <path id="path2" class="query-path enhanced-arrow" d="M 460 660 Q 500 660 540 660" stroke="#48bb78" stroke-width="6" fill="none" marker-end="url(#arrowhead)" opacity="0" />
+        <path id="path3" class="query-path enhanced-arrow" d="M 700 630 Q 740 580 780 510" stroke="#ed8936" stroke-width="6" fill="none" marker-end="url(#arrowhead)" opacity="0" />
+        <path id="path4" class="query-path enhanced-arrow" d="M 860 450 Q 860 420 860 400" stroke="#e53e3e" stroke-width="6" fill="none" marker-end="url(#arrowhead)" opacity="0" />
+        <path id="path5" class="query-path enhanced-arrow" d="M 860 280 Q 860 250 860 230" stroke="#805ad5" stroke-width="6" fill="none" marker-end="url(#arrowhead)" opacity="0" />
+        <path id="path6" class="query-path enhanced-arrow" d="M 780 170 Q 730 170 700 170" stroke="#38b2ac" stroke-width="6" fill="none" marker-end="url(#arrowhead)" opacity="0" /> <!-- Response Path -->
+        <path id="returnPath" class="query-path enhanced-arrow" d="M 540 200 Q 350 400 220 600" stroke="#d69e2e" stroke-width="8" fill="none" marker-end="url(#arrowhead)" opacity="0" stroke-dasharray="20,8" /> <!-- Data Packets -->
+        <g id="dataPackets"><!-- Packet 1: User to Cache -->
+         <circle class="data-packet" id="packet1" cx="220" cy="660" r="12" fill="#667eea" opacity="0">
+          <animate attributename="cx" values="220;300" dur="1s" begin="0s" fill="freeze" />
+          <animate attributename="opacity" values="0;1;1;0" dur="1s" begin="0s" fill="freeze" />
+         </circle> <!-- Packet 2: Cache to ISP -->
+         <circle class="data-packet" id="packet2" cx="460" cy="660" r="12" fill="#48bb78" opacity="0">
+          <animate attributename="cx" values="460;540" dur="1s" begin="1s" fill="freeze" />
+          <animate attributename="opacity" values="0;1;1;0" dur="1s" begin="1s" fill="freeze" />
+         </circle> <!-- Packet 3: ISP to Root -->
+         <circle class="data-packet" id="packet3" cx="700" cy="630" r="12" fill="#ed8936" opacity="0">
+          <animatemotion dur="1.2s" begin="2s" fill="freeze">
+           <mpath href="#path3" />
+          </animatemotion>
+          <animate attributename="opacity" values="0;1;1;0" dur="1.2s" begin="2s" fill="freeze" />
+         </circle> <!-- Packet 4: Root to TLD -->
+         <circle class="data-packet" id="packet4" cx="860" cy="450" r="12" fill="#e53e3e" opacity="0">
+          <animate attributename="cy" values="450;400" dur="0.8s" begin="3.2s" fill="freeze" />
+          <animate attributename="opacity" values="0;1;1;0" dur="0.8s" begin="3.2s" fill="freeze" />
+         </circle> <!-- Packet 5: TLD to Auth -->
+         <circle class="data-packet" id="packet5" cx="860" cy="280" r="12" fill="#805ad5" opacity="0">
+          <animate attributename="cy" values="280;230" dur="0.8s" begin="4s" fill="freeze" />
+          <animate attributename="opacity" values="0;1;1;0" dur="0.8s" begin="4s" fill="freeze" />
+         </circle> <!-- Packet 6: Auth to Web Server -->
+         <circle class="data-packet" id="packet6" cx="780" cy="170" r="12" fill="#38b2ac" opacity="0">
+          <animate attributename="cx" values="780;700" dur="1s" begin="4.8s" fill="freeze" />
+          <animate attributename="opacity" values="0;1;1;0" dur="1s" begin="4.8s" fill="freeze" />
+         </circle> <!-- Response Packet: Web Server back to User -->
+         <circle class="data-packet" id="responsePacket" cx="540" cy="200" r="16" fill="#d69e2e" opacity="0">
+          <animatemotion dur="2s" begin="5.8s" fill="freeze">
+           <mpath href="#returnPath" />
+          </animatemotion>
+          <animate attributename="opacity" values="0;1;1;0.5" dur="2s" begin="5.8s" fill="freeze" />
+          <animate attributename="r" values="16;20;16" dur="0.5s" repeatcount="4" begin="5.8s" />
+         </circle>
+        </g> <!-- Response Animations -->
+        <g id="responseAnimations">
+         <text class="response-animation" x="250" y="640" opacity="0" font-size="14">
+          Cache Miss!
+         </text>
+         <text class="response-animation" x="480" y="640" opacity="0" font-size="14">
+          Forwarding...
+         </text>
+         <text class="response-animation" x="720" y="520" opacity="0" font-size="14">
+          TLD Found!
+         </text>
+         <text class="response-animation" x="870" y="410" opacity="0" font-size="14">
+          Auth NS Found!
+         </text>
+         <text class="response-animation" x="870" y="240" opacity="0" font-size="14">
+          IP: 192.168.1.100
+         </text>
+         <text class="response-animation" x="700" y="180" opacity="0" font-size="14">
+          Website Ready!
+         </text>
+         <text class="response-animation" x="400" y="450" opacity="0" font-size="16">
+          DNS Complete!
+         </text>
+        </g>
+       </g> <!-- Arrow Marker Definition --> <defs>
+        <marker id="arrowhead" markerwidth="12" markerheight="9" refx="11" refy="4.5" orient="auto">
+         <polygon points="0 0, 12 4.5, 0 9" fill="#333" />
+        </marker>
+       </defs> <!-- Data Flow Labels --> <text x="600" y="40" text-anchor="middle" font-size="20" font-weight="bold" fill="#2c3e50">
+        DNS Resolution Flow - Created by Neeraj Jaiswar
+       </text> <text x="200" y="770" font-size="14" fill="#666">
+        Query: www.example.com → IP: 192.168.1.100
+       </text> <text x="700" y="770" font-size="14" fill="#666">
+        Total Time: ~50-100ms
+       </text>
+      </svg>
+     </div><!-- Detailed Step Explanation -->
+     <div class="dns-steps-detailed">
+      <h4 style="text-align: center; margin: 2rem 0; color: #2c3e50;">Detailed Step-by-Step Process</h4>
+      <div class="step-grid">
+       <div class="detailed-step" data-step="1">
+        <div class="step-number">
+         1
+        </div>
+        <div class="step-content">
+         <h5>User Types URL</h5>
+         <p>User enters "www.example.com" in browser. Browser needs to find the IP address to connect to the server.</p>
+         <div class="step-details"><span class="detail-tag">Time: 0ms</span> <span class="detail-tag">Action: URL Input</span>
+         </div>
+        </div>
+       </div>
+       <div class="detailed-step" data-step="2">
+        <div class="step-number">
+         2
+        </div>
+        <div class="step-content">
+         <h5>Local Cache Check</h5>
+         <p>Browser checks local DNS cache and OS cache. If found, returns immediately. Cache TTL typically 300-3600 seconds.</p>
+         <div class="step-details"><span class="detail-tag">Time: 1-5ms</span> <span class="detail-tag">Cache Hit: 80%</span>
+         </div>
+        </div>
+       </div>
+       <div class="detailed-step" data-step="3">
+        <div class="step-content">
+         <h5>ISP DNS Resolver</h5>
+         <p>Query sent to ISP's recursive DNS server (like 8.8.8.8). This server will do the heavy lifting of DNS resolution.</p>
+         <div class="step-details"><span class="detail-tag">Time: 5-15ms</span> <span class="detail-tag">Server: Recursive</span>
+         </div>
+        </div>
+        <div class="step-number">
+         3
+        </div>
+       </div>
+       <div class="detailed-step" data-step="4">
+        <div class="step-number">
+         4
+        </div>
+        <div class="step-content">
+         <h5>Root Name Servers</h5>
+         <p>Query sent to one of 13 root servers worldwide. Root server responds with TLD server information for .com domains.</p>
+         <div class="step-details"><span class="detail-tag">Time: 10-30ms</span> <span class="detail-tag">Servers: 13 Global</span>
+         </div>
+        </div>
+       </div>
+       <div class="detailed-step" data-step="5">
+        <div class="step-content">
+         <h5>TLD Name Servers</h5>
+         <p>Query sent to .com TLD servers. TLD server responds with authoritative name server for example.com domain.</p>
+         <div class="step-details"><span class="detail-tag">Time: 15-40ms</span> <span class="detail-tag">TLD: .com Registry</span>
+         </div>
+        </div>
+        <div class="step-number">
+         5
+        </div>
+       </div>
+       <div class="detailed-step" data-step="6">
+        <div class="step-number">
+         6
+        </div>
+        <div class="step-content">
+         <h5>Authoritative Servers</h5>
+         <p>Query sent to example.com's authoritative name servers. These servers have the actual IP address for www.example.com.</p>
+         <div class="step-details"><span class="detail-tag">Time: 20-50ms</span> <span class="detail-tag">Response: A Record</span>
+         </div>
+        </div>
+       </div>
+       <div class="detailed-step" data-step="7">
+        <div class="step-content">
+         <h5>IP Address Returned</h5>
+         <p>Complete IP address (192.168.1.100) returned to browser. Browser can now connect to web server and load the website.</p>
+         <div class="step-details"><span class="detail-tag">Total: 50-100ms</span> <span class="detail-tag">Status: Complete</span>
+         </div>
+        </div>
+        <div class="step-number">
+         7
+        </div>
+       </div>
+      </div>
+     </div><!-- DNS Record Types Visualization -->
+     <div class="dns-records-section">
+      <h4 style="text-align: center; margin: 3rem 0 2rem 0; color: #2c3e50;">DNS Record Types</h4>
+      <div class="records-grid">
+       <div class="record-card">
+        <div class="record-type">
+         A
+        </div>
+        <h5>Address Record</h5>
+        <p>Maps domain to IPv4 address</p><code>example.com → 192.168.1.100</code>
+       </div>
+       <div class="record-card">
+        <div class="record-type">
+         AAAA
+        </div>
+        <h5>IPv6 Address</h5>
+        <p>Maps domain to IPv6 address</p><code>example.com → 2001:db8::1</code>
+       </div>
+       <div class="record-card">
+        <div class="record-type">
+         CNAME
+        </div>
+        <h5>Canonical Name</h5>
+        <p>Creates alias for another domain</p><code>www → example.com</code>
+       </div>
+       <div class="record-card">
+        <div class="record-type">
+         MX
+        </div>
+        <h5>Mail Exchange</h5>
+        <p>Specifies mail server</p><code>mail.example.com</code>
+       </div>
+       <div class="record-card">
+        <div class="record-type">
+         NS
+        </div>
+        <h5>Name Server</h5>
+        <p>Identifies authoritative servers</p><code>ns1.example.com</code>
+       </div>
+       <div class="record-card">
+        <div class="record-type">
+         TXT
+        </div>
+        <h5>Text Record</h5>
+        <p>Stores text information</p><code>"v=spf1 include:_spf"</code>
+       </div>
+      </div>
+     </div>
+     <div style="text-align: center; margin-top: 3rem; padding: 2rem; background: rgba(102, 126, 234, 0.1); border-radius: 15px;">
+      <h4 style="color: #667eea; margin-bottom: 1rem;">⚡ Performance Facts</h4>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-top: 1rem;">
+       <div>
+        <strong>Average Query Time:</strong> 50-100ms
+       </div>
+       <div>
+        <strong>Cache Hit Rate:</strong> 80-90%
+       </div>
+       <div>
+        <strong>Daily Queries:</strong> 4+ Billion
+       </div>
+       <div>
+        <strong>Root Servers:</strong> 13 Worldwide
+       </div>
+      </div>
+     </div>
+    </section><!-- Content Sections -->
+    <section class="content-section fade-in-on-scroll">
+     <h3>What is DNS?</h3>
+     <p>The Domain Name System (DNS) is like the phonebook of the internet. When you type a website address like "google.com" into your browser, DNS translates that human-readable domain name into an IP address that computers can understand, such as 172.217.164.110.</p>
+     <p>Without DNS, you would need to memorize complex IP addresses for every website you want to visit. Imagine having to remember 172.217.164.110 instead of simply typing "google.com" - that's the magic DNS provides!</p>
+    </section>
+    <section class="content-section fade-in-on-scroll">
+     <h3>DNS Record Types</h3>
+     <p>DNS uses different types of records to store various kinds of information:</p>
+     <div class="code-block">
+      A Record: Maps domain to IPv4 address AAAA Record: Maps domain to IPv6 address CNAME Record: Creates an alias for another domain MX Record: Specifies mail exchange servers TXT Record: Stores text information NS Record: Identifies authoritative name servers
+     </div>
+     <p>Each record type serves a specific purpose in the DNS ecosystem, ensuring that different services like web hosting, email, and subdomains work seamlessly together.</p>
+    </section>
+    <section class="content-section fade-in-on-scroll">
+     <h3>DNS Hierarchy</h3>
+     <p>DNS operates in a hierarchical structure, starting from the root servers at the top, followed by Top-Level Domain (TLD) servers like .com, .org, and .net, then authoritative name servers for specific domains.</p>
+     <p>This distributed system ensures reliability and speed. If one server fails, others can handle the requests, making the internet more resilient and faster for users worldwide.</p>
+    </section><!-- Statistics Section -->
+    <section class="fade-in-on-scroll" id="stats">
+     <h3 style="text-align: center; margin-bottom: 2rem; color: #2c3e50;">DNS by the Numbers</h3>
+     <div class="stats-grid">
+      <div class="stat-card">
+       <div class="stat-number">
+        13
+       </div>
+       <p>Root DNS Servers Worldwide</p>
+      </div>
+      <div class="stat-card">
+       <div class="stat-number">
+        1000+
+       </div>
+       <p>Top-Level Domains Available</p>
+      </div>
+      <div class="stat-card">
+       <div class="stat-number">
+        50ms
+       </div>
+       <p>Average DNS Query Time</p>
+      </div>
+      <div class="stat-card">
+       <div class="stat-number">
+        Billions
+       </div>
+       <p>DNS Queries Per Day</p>
+      </div>
+     </div>
+    </section>
+    <section class="content-section fade-in-on-scroll">
+     <h3>DNS Security</h3>
+     <p>DNS security is crucial for internet safety. DNSSEC (DNS Security Extensions) adds cryptographic signatures to DNS records, preventing attackers from redirecting users to malicious websites through DNS poisoning or spoofing attacks.</p>
+     <p>Modern DNS implementations also include features like DNS over HTTPS (DoH) and DNS over TLS (DoT), which encrypt DNS queries to protect user privacy and prevent eavesdropping.</p>
+    </section>
+    <section class="content-section fade-in-on-scroll">
+     <h3>Common DNS Issues and Solutions</h3>
+     <p>DNS problems can cause websites to become inaccessible. Common issues include:</p>
+     <ul style="margin: 1rem 0; padding-left: 2rem;">
+      <li><strong>DNS Cache Poisoning:</strong> Malicious entries in DNS cache</li>
+      <li><strong>DNS Server Downtime:</strong> Primary DNS servers becoming unavailable</li>
+      <li><strong>Propagation Delays:</strong> Time needed for DNS changes to spread globally</li>
+      <li><strong>Misconfigured Records:</strong> Incorrect DNS record settings</li>
+     </ul>
+     <p>Solutions include using multiple DNS servers, implementing DNSSEC, regular cache clearing, and monitoring DNS health with specialized tools.</p>
+    </section>
+   </div>
+  </main><!-- Footer -->
+  <footer id="contact">
+   <div class="footer-content">
+    <h3>Stay Connected</h3>
+    <p id="footerText">© 2025 DNS Deep Dive Blog. All rights reserved.</p>
+   </div>
+  </footer><!-- Floating Action Button --> <a href="#home" class="fab">↑</a>
+  <script>
+        // Configuration object for editable content
+        const defaultConfig = {
+            blog_title: "DNS Deep Dive",
+            hero_subtitle: "Explore the Domain Name System with interactive animations and crystal-clear explanations",
+            article_title: "The Complete Guide to DNS: How the Internet Finds Your Website",
+            author_name: "Neeraj Jaiswar",
+            footer_text: "© 2024 DNS Deep Dive Blog. All rights reserved."
+        };
+
+        // Initialize particles animation
+        function createParticles() {
+            const particlesContainer = document.getElementById('particles');
+            const particleCount = 50;
+
+            for (let i = 0; i < particleCount; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                particle.style.left = Math.random() * 100 + '%';
+                particle.style.top = Math.random() * 100 + '%';
+                particle.style.animationDelay = Math.random() * 6 + 's';
+                particle.style.animationDuration = (Math.random() * 3 + 3) + 's';
+                particlesContainer.appendChild(particle);
+            }
+        }
+
+        // Scroll progress bar
+        function updateProgressBar() {
+            const scrollTop = document.documentElement.scrollTop || document.body.scrollTop;
+            const scrollHeight = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+            const scrollPercent = (scrollTop / scrollHeight) * 100;
+            document.getElementById('progressBar').style.width = scrollPercent + '%';
+        }
+
+        // Scroll animations
+        function handleScrollAnimations() {
+            const elements = document.querySelectorAll('.fade-in-on-scroll');
+            const windowHeight = window.innerHeight;
+
+            elements.forEach(element => {
+                const elementTop = element.getBoundingClientRect().top;
+                if (elementTop < windowHeight - 100) {
+                    element.classList.add('visible');
+                }
+            });
+        }
+
+
+
+        // Smooth scrolling for navigation links
+        function initSmoothScrolling() {
+            const links = document.querySelectorAll('a[href^="#"]');
+            links.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const targetId = this.getAttribute('href').substring(1);
+                    const targetElement = document.getElementById(targetId);
+                    if (targetElement) {
+                        const offsetTop = targetElement.offsetTop - 80;
+                        window.scrollTo({
+                            top: offsetTop,
+                            behavior: 'smooth'
+                        });
+                    }
+                });
+            });
+        }
+
+        // Counter animation for statistics
+        function animateCounters() {
+            const counters = document.querySelectorAll('.stat-number');
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const counter = entry.target;
+                        const target = counter.textContent;
+                        let current = 0;
+                        const increment = target === 'Billions' ? 1 : target === '1000+' ? 50 : target === '50ms' ? 2 : 1;
+                        const timer = setInterval(() => {
+                            if (target === 'Billions') {
+                                counter.textContent = 'Billions';
+                                clearInterval(timer);
+                            } else if (target === '1000+') {
+                                current += increment;
+                                if (current >= 1000) {
+                                    counter.textContent = '1000+';
+                                    clearInterval(timer);
+                                } else {
+                                    counter.textContent = current;
+                                }
+                            } else if (target === '50ms') {
+                                current += increment;
+                                if (current >= 50) {
+                                    counter.textContent = '50ms';
+                                    clearInterval(timer);
+                                } else {
+                                    counter.textContent = current + 'ms';
+                                }
+                            } else {
+                                current += increment;
+                                if (current >= parseInt(target)) {
+                                    counter.textContent = target;
+                                    clearInterval(timer);
+                                } else {
+                                    counter.textContent = current;
+                                }
+                            }
+                        }, 100);
+                        observer.unobserve(counter);
+                    }
+                });
+            });
+
+            counters.forEach(counter => observer.observe(counter));
+        }
+
+        // Element SDK Configuration
+        async function onConfigChange(config) {
+            const blogTitle = config.blog_title || defaultConfig.blog_title;
+            const heroSubtitle = config.hero_subtitle || defaultConfig.hero_subtitle;
+            const articleTitle = config.article_title || defaultConfig.article_title;
+            const authorName = config.author_name || defaultConfig.author_name;
+            const footerText = config.footer_text || defaultConfig.footer_text;
+
+            // Update DOM elements
+            document.getElementById('blogTitle').textContent = blogTitle;
+            document.getElementById('heroSubtitle').textContent = heroSubtitle;
+            document.getElementById('articleTitle').textContent = articleTitle;
+            document.getElementById('authorName').textContent = authorName;
+            document.getElementById('footerText').textContent = footerText;
+        }
+
+        function mapToCapabilities(config) {
+            return {
+                recolorables: [],
+                borderables: [],
+                fontEditable: undefined,
+                fontSizeable: undefined
+            };
+        }
+
+        function mapToEditPanelValues(config) {
+            return new Map([
+                ["blog_title", config.blog_title || defaultConfig.blog_title],
+                ["hero_subtitle", config.hero_subtitle || defaultConfig.hero_subtitle],
+                ["article_title", config.article_title || defaultConfig.article_title],
+                ["author_name", config.author_name || defaultConfig.author_name],
+                ["footer_text", config.footer_text || defaultConfig.footer_text]
+            ]);
+        }
+
+        // Advanced DNS Animation System
+        class DNSAnimationController {
+            constructor() {
+                this.isPlaying = false;
+                this.isPaused = false;
+                this.currentStep = 0;
+                this.animationSpeed = 1;
+                this.totalSteps = 7;
+                this.stepDurations = [1000, 1000, 1200, 800, 800, 1000, 2000]; // milliseconds
+                this.elapsedTime = 0;
+                this.animationTimer = null;
+                this.stepTimer = null;
+                
+                this.initializeControls();
+                this.resetAnimation();
+            }
+
+            initializeControls() {
+                document.getElementById('playBtn').addEventListener('click', () => this.playAnimation());
+                document.getElementById('pauseBtn').addEventListener('click', () => this.pauseAnimation());
+                document.getElementById('resetBtn').addEventListener('click', () => this.resetAnimation());
+                document.getElementById('slowBtn').addEventListener('click', () => this.setSpeed(0.5));
+                document.getElementById('fastBtn').addEventListener('click', () => this.setSpeed(2));
+            }
+
+            playAnimation() {
+                if (this.isPaused) {
+                    this.resumeAnimation();
+                    return;
+                }
+
+                this.isPlaying = true;
+                this.updateControlButtons();
+                this.startStepSequence();
+                this.startMetricsUpdate();
+            }
+
+            pauseAnimation() {
+                this.isPaused = true;
+                this.isPlaying = false;
+                this.updateControlButtons();
+                
+                if (this.stepTimer) {
+                    clearTimeout(this.stepTimer);
+                }
+                if (this.animationTimer) {
+                    clearInterval(this.animationTimer);
+                }
+
+                // Pause SVG animations
+                const svg = document.getElementById('dnsSvg');
+                svg.pauseAnimations();
+            }
+
+            resumeAnimation() {
+                this.isPaused = false;
+                this.isPlaying = true;
+                this.updateControlButtons();
+                
+                // Resume SVG animations
+                const svg = document.getElementById('dnsSvg');
+                svg.unpauseAnimations();
+                
+                this.continueStepSequence();
+                this.startMetricsUpdate();
+            }
+
+            resetAnimation() {
+                this.isPlaying = false;
+                this.isPaused = false;
+                this.currentStep = 0;
+                this.elapsedTime = 0;
+                
+                if (this.stepTimer) clearTimeout(this.stepTimer);
+                if (this.animationTimer) clearInterval(this.animationTimer);
+                
+                this.updateControlButtons();
+                this.updateMetrics();
+                this.updateTimeline();
+                this.resetVisualElements();
+                
+                // Reset SVG animations
+                const svg = document.getElementById('dnsSvg');
+                svg.setCurrentTime(0);
+            }
+
+            setSpeed(speed) {
+                this.animationSpeed = speed;
+                this.updateControlButtons();
+                
+                // Update SVG animation speed
+                const svg = document.getElementById('dnsSvg');
+                const animations = svg.querySelectorAll('animate, animateMotion');
+                animations.forEach(anim => {
+                    const dur = parseFloat(anim.getAttribute('dur')) / speed;
+                    anim.setAttribute('dur', dur + 's');
+                });
+            }
+
+            startStepSequence() {
+                this.executeStep(this.currentStep);
+            }
+
+            continueStepSequence() {
+                if (this.currentStep < this.totalSteps) {
+                    this.executeStep(this.currentStep);
+                }
+            }
+
+            executeStep(stepIndex) {
+                if (!this.isPlaying || this.isPaused) return;
+
+                this.currentStep = stepIndex;
+                this.updateMetrics();
+                this.updateTimeline();
+                this.highlightCurrentComponent(stepIndex);
+                this.updateStepIndicator(stepIndex);
+                this.triggerStepAnimation(stepIndex);
+
+                const duration = this.stepDurations[stepIndex] / this.animationSpeed;
+                
+                this.stepTimer = setTimeout(() => {
+                    if (stepIndex < this.totalSteps - 1) {
+                        this.executeStep(stepIndex + 1);
+                    } else {
+                        this.completeAnimation();
+                    }
+                }, duration);
+            }
+
+            triggerStepAnimation(stepIndex) {
+                const components = document.querySelectorAll('.dns-component');
+                const paths = document.querySelectorAll('.query-path');
+                const packets = document.querySelectorAll('.data-packet');
+                
+                // Reset all components
+                components.forEach(comp => comp.classList.remove('active'));
+                
+                // Activate current component
+                const currentComponent = document.querySelector(`[data-step="${stepIndex + 1}"]`);
+                if (currentComponent) {
+                    currentComponent.classList.add('active');
+                }
+
+                // Trigger specific animations based on step
+                switch(stepIndex) {
+                    case 0:
+                        this.animateTyping();
+                        break;
+                    case 1:
+                        this.animateCacheSearch();
+                        break;
+                    case 2:
+                        this.animateNetworkActivity();
+                        break;
+                    case 3:
+                        this.animateRootServers();
+                        break;
+                    case 4:
+                        this.animateTLDSelection();
+                        break;
+                    case 5:
+                        this.animateDatabaseQuery();
+                        break;
+                    case 6:
+                        this.animateServerActivity();
+                        break;
+                }
+            }
+
+            animateTyping() {
+                const typingBar = document.getElementById('typingBar');
+                typingBar.style.opacity = '1';
+            }
+
+            animateCacheSearch() {
+                const cacheSearch = document.getElementById('cacheSearch');
+                cacheSearch.style.opacity = '1';
+            }
+
+            animateNetworkActivity() {
+                const networkActivity = document.getElementById('networkActivity');
+                networkActivity.style.opacity = '1';
+            }
+
+            animateRootServers() {
+                // Root servers are already animated via SVG
+            }
+
+            animateTLDSelection() {
+                const tldHighlight = document.getElementById('tldHighlight');
+                tldHighlight.style.opacity = '0.8';
+            }
+
+            animateDatabaseQuery() {
+                const dbQuery = document.getElementById('dbQuery');
+                dbQuery.style.opacity = '1';
+            }
+
+            animateServerActivity() {
+                const serverActivity = document.getElementById('serverActivity');
+                serverActivity.style.opacity = '1';
+            }
+
+            highlightCurrentComponent(stepIndex) {
+                const stepIndicator = document.getElementById('stepIndicator');
+                const loadingSpinner = document.getElementById('loadingSpinner');
+                
+                const stepNames = [
+                    'User Input',
+                    'Cache Lookup', 
+                    'ISP Query',
+                    'Root Servers',
+                    'TLD Servers', 
+                    'Auth Servers',
+                    'Web Server Response'
+                ];
+
+                stepIndicator.innerHTML = `Step ${stepIndex + 1}: ${stepNames[stepIndex]} <span class="loading-animation" style="display: inline-block;"></span>`;
+            }
+
+            updateStepIndicator(stepIndex) {
+                const stepNames = [
+                    'User types URL in browser',
+                    'Checking local DNS cache', 
+                    'Querying ISP DNS resolver',
+                    'Contacting root name servers',
+                    'Querying TLD servers', 
+                    'Contacting authoritative servers',
+                    'Receiving website content'
+                ];
+
+                document.getElementById('stepIndicator').innerHTML = 
+                    `Step ${stepIndex + 1}: ${stepNames[stepIndex]} <span class="loading-animation"></span>`;
+            }
+
+            startMetricsUpdate() {
+                this.animationTimer = setInterval(() => {
+                    if (!this.isPaused) {
+                        this.elapsedTime += 50;
+                        this.updateMetrics();
+                    }
+                }, 50);
+            }
+
+            updateMetrics() {
+                document.getElementById('currentStep').textContent = this.currentStep + 1;
+                document.getElementById('elapsedTime').textContent = this.elapsedTime + 'ms';
+                document.getElementById('packetsTransmitted').textContent = Math.min(this.currentStep + 1, 7);
+                document.getElementById('serversContacted').textContent = Math.max(0, this.currentStep - 1);
+            }
+
+            updateTimeline() {
+                const progress = ((this.currentStep + 1) / this.totalSteps) * 100;
+                document.getElementById('timelineProgress').style.width = progress + '%';
+            }
+
+            updateControlButtons() {
+                const playBtn = document.getElementById('playBtn');
+                const pauseBtn = document.getElementById('pauseBtn');
+                const slowBtn = document.getElementById('slowBtn');
+                const fastBtn = document.getElementById('fastBtn');
+
+                // Reset all button states
+                [playBtn, pauseBtn, slowBtn, fastBtn].forEach(btn => btn.classList.remove('active'));
+
+                if (this.isPlaying) {
+                    playBtn.classList.add('active');
+                } else if (this.isPaused) {
+                    pauseBtn.classList.add('active');
+                }
+
+                if (this.animationSpeed === 0.5) {
+                    slowBtn.classList.add('active');
+                } else if (this.animationSpeed === 2) {
+                    fastBtn.classList.add('active');
+                }
+            }
+
+            resetVisualElements() {
+                // Reset all visual elements
+                const components = document.querySelectorAll('.dns-component');
+                components.forEach(comp => comp.classList.remove('active'));
+
+                // Reset animated elements
+                document.getElementById('typingBar').style.opacity = '0';
+                document.getElementById('cacheSearch').style.opacity = '0';
+                document.getElementById('networkActivity').style.opacity = '0';
+                document.getElementById('tldHighlight').style.opacity = '0';
+                document.getElementById('dbQuery').style.opacity = '0';
+                document.getElementById('serverActivity').style.opacity = '0';
+
+                // Reset step indicator
+                document.getElementById('stepIndicator').innerHTML = 'Step 1: User Input';
+            }
+
+            completeAnimation() {
+                this.isPlaying = false;
+                this.updateControlButtons();
+                
+                if (this.animationTimer) {
+                    clearInterval(this.animationTimer);
+                }
+
+                // Show completion message
+                document.getElementById('stepIndicator').innerHTML = 
+                    '✅ DNS Resolution Complete! Website loaded successfully.';
+                
+                // Auto-reset after 3 seconds
+                setTimeout(() => {
+                    if (!this.isPlaying) {
+                        this.resetAnimation();
+                    }
+                }, 3000);
+            }
+        }
+
+        // Initialize everything when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            createParticles();
+            initSmoothScrolling();
+            animateCounters();
+            
+            // Initialize DNS Animation Controller
+            window.dnsAnimationController = new DNSAnimationController();
+            
+            // Initialize Element SDK
+            if (window.elementSdk) {
+                window.elementSdk.init({
+                    defaultConfig,
+                    onConfigChange,
+                    mapToCapabilities,
+                    mapToEditPanelValues
+                });
+            }
+
+            // Event listeners
+            window.addEventListener('scroll', function() {
+                updateProgressBar();
+                handleScrollAnimations();
+            });
+
+            // Trigger initial scroll animations
+            handleScrollAnimations();
+
+            // Auto-start animation after 2 seconds
+            setTimeout(() => {
+                if (window.dnsAnimationController) {
+                    window.dnsAnimationController.playAnimation();
+                }
+            }, 2000);
+        });
+
+        // Add some interactive hover effects
+        document.addEventListener('DOMContentLoaded', function() {
+            const dnsSteps = document.querySelectorAll('.dns-step');
+            dnsSteps.forEach((step, index) => {
+                step.addEventListener('mouseenter', function() {
+                    this.style.transform = 'translateY(-10px) scale(1.05)';
+                    this.style.boxShadow = '0 15px 30px rgba(102, 126, 234, 0.3)';
+                });
+                
+                step.addEventListener('mouseleave', function() {
+                    this.style.transform = 'translateY(0) scale(1)';
+                    this.style.boxShadow = '0 5px 15px rgba(0, 0, 0, 0.1)';
+                });
+            });
+        });
+    </script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9a01ca4e541ef487',t:'MTc2MzQwOTM3NC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
